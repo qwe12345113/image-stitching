@@ -23,4 +23,8 @@ This code is from [ppwwyyxx/OpenPanno](https://github.com/ppwwyyxx/OpenPano).
 	  ./image_stitch test file1 file2 ...
 - Add **loop** command. It could load video stream
 	 ./image_stitch loop file1 file2 ...
+
 Other details could be checked from original github.
+
+
+# Add new branch
