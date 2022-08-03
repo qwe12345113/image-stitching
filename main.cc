@@ -478,6 +478,52 @@ void planet(const char* fname) {
 	write_rgb(IMGFILE(planet), ret);
 }
 
+
+void testround(){
+	
+	Mat32f res;
+	cv::Mat input;
+	input = cv::imread("out_crop2.jpg", 1);
+	
+	REP(i, 2) imgs1.emplace_back(" ");
+	CylinderStitcher *p1 = new CylinderStitcher(move(imgs1));
+	
+	Mat32f left(crop_res.height(), int(crop_res.width() / 2), 3);
+	Mat32f right(crop_res.height(), int(crop_res.width() / 2), 3);
+		
+	REP(i, left.height()) 
+	{
+		float* dst = left.ptr(i, 0);
+		const float* src = crop_res.ptr(i);
+		memcpy(dst, src, 3 * left.width() * sizeof(float));
+	}
+	//write_rgb(IMGFILE(left), left);
+		
+	REP(i, right.height()) 
+	{
+		float* dst = right.ptr(i, 0);
+		const float* src = crop_res.ptr(i, right.width());
+		memcpy(dst, src, 3 * right.width() * sizeof(float));
+	}
+
+	
+	res = p1->build_2(right, left);
+
+	cv::Mat image = img2opencv(res);
+	cv::namedWindow("Test window");
+	
+	cv::imshow("Test window", image);
+	cv::waitKey(0);
+	{
+		GuardedTimer tm("Writing image");
+		write_rgb(IMGFILE(out), res);
+	}
+}
+
+
+
+
+
 int main(int argc, char* argv[]) {
 	if (argc <= 2)
 		error_exit("Need at least two images to stitch.\n");
