@@ -58,7 +58,8 @@ class StitcherBase {
 
 		virtual Mat32f build() = 0;
 		virtual Mat32f build_new() = 0;
-		void load_stream(int number);
+		void load_stream(int number, char* argv[]);
+
 		virtual ~StitcherBase() = default;
 };
 

@@ -82,9 +82,9 @@ cv::Mat img2opencv(Mat32f img) {
 void test_extrema(const char* fname, int mode) {
 	//auto mat = read_img(fname);
 	cv::Mat image = cv::imread(fname);
-	print_debug("opencv to cimg\n");
+	
 	auto mat = opencv2img(image);
-
+	
 	ScaleSpace ss(mat, NUM_OCTAVE, NUM_SCALE);
 	DOGSpace dog(ss);
 	ExtremaDetector ex(dog);
@@ -160,8 +160,14 @@ void test_match(const char* f1, const char* f2) {
 // draw inliers of the estimated homography
 void test_inlier(const char* f1, const char* f2) {
 	list<Mat32f> imagelist;
-	Mat32f pic1 = read_img(f1);
-	Mat32f pic2 = read_img(f2);
+	//Mat32f pic1 = read_img(f1);
+	//Mat32f pic2 = read_img(f2);
+	cv::Mat image = cv::imread(f1);
+
+	auto pic1 = opencv2img(image);
+	image = cv::imread(f2);
+
+	auto pic2 = opencv2img(image);
 	
 	imagelist.push_back(pic1);
 	imagelist.push_back(pic2);
@@ -269,7 +275,7 @@ void work(int argc, char* argv[]) {
 		p = new Stitcher(move(imgs));
 		//res = p.build();
 	}
-    res = p->build();
+    res = p->build_new();
 	if (CROP) {
 		int oldw = res.width(), oldh = res.height();
 		res = crop(res);
@@ -281,30 +287,34 @@ void work(int argc, char* argv[]) {
 	}
 }
 
-void loop(char* argv[]) {
+void loop(int argc, char* argv[]) {
 
  	std::cout << "loop start" << std::endl;
 	vector<string> imgs;	
-	REP(i, stoi(argv[2])) imgs.emplace_back(" ");
+	//REP(i, stoi(argv[2])) imgs.emplace_back(" ");
+	REPL(i, 2, argc) imgs.emplace_back(" ");
 	
 	Mat32f res;
 
 	CylinderStitcher *p = new CylinderStitcher(move(imgs));
 	std::cout << "load stream" << std::endl;
-	p->load_stream(stoi(argv[2]));		
+	p->load_stream(imgs.size(), argv);		
 
 	while(char(cv::waitKey(10)) != 'q'){
-		std::cout << "while loop start" << std::endl;
 		res = p->build_stream();
 		if (CROP) {
-			int oldw = res.width(), oldh = res.height();
+			//int oldw = res.width(), oldh = res.height();
 			res = crop(res);
-			print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
+			//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
 		}
+
 		//sleep(1);
 		cv::Mat image = img2opencv(res);
+		cv::resize(image, image, cv::Size(image.cols * 0.5, image.rows * 0.5));
 		cv::imshow("video window", image);
 	}
+	//writer.release();
+	std::cout << "writer close" << std::endl;
 	delete p;
 	{
 		GuardedTimer tm("Writing image");
@@ -342,15 +352,18 @@ void test(int argc, char* argv[]) {
 		res = crop(res);
 		print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
 	}
+	
+	//cv::Mat image = cv::imread("out.jpg");
 	cv::Mat image = img2opencv(res);
 	cv::namedWindow("Test window");
 	
 	cv::imshow("Test window", image);
 	cv::waitKey(0);
-	{
+	
+	/*{
 		GuardedTimer tm("Writing image");
-		write_rgb(IMGFILE(out), res);
-	}
+		write_rgb(IMGFILE(result), res);
+	}*/
 }
 
 void init_config() {
@@ -451,8 +464,8 @@ void planet(const char* fname) {
 }
 
 int main(int argc, char* argv[]) {
-	if (argc <= 2)
-		error_exit("Need at least two images to stitch.\n");
+	//if (argc <= 2)
+	//	error_exit("Need at least two images to stitch.\n");
 	TotalTimerGlobalGuard _g;
 	srand(time(NULL));
 	init_config();
@@ -472,7 +485,7 @@ int main(int argc, char* argv[]) {
 	else if (command == "planet")
 		planet(argv[2]);
 	else if (command == "loop")
-		loop(argv);
+		loop(argc, argv);
 	else if (command == "test")
 		test(argc, argv);
 	else
@@ -483,7 +496,7 @@ int main(int argc, char* argv[]) {
 	cv::namedWindow("Test window");
 	cv::imshow("Test window", image);
 	cv::waitKey(0);
-	//*/
+	*/
 	return 0;
 }
 

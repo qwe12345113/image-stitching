@@ -58,7 +58,7 @@ class Stitcher : public StitcherBase {
 			}
 
 		virtual Mat32f build();
-		virtual Mat32f build_new();
+		virtual Mat32f build_new();		
 };
 
 }

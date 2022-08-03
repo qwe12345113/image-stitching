@@ -3,6 +3,7 @@
 
 #include "stitcherbase.hh"
 #include "lib/timer.hh"
+#include <string>
 
 namespace pano {
 
@@ -29,17 +30,18 @@ void StitcherBase::calc_feature() {
   std::cout << std::endl;
 }
 
-void StitcherBase::load_stream(int number) {
+void StitcherBase::load_stream(int number, char*argv[]) {
 	
-	std::string sub = ".webm";
-	REPL(i, 1, number+1) {
-    std::cout << std::to_string(i)+sub << std::endl;
-    std::string name = std::to_string(i)+sub;
-    cv::VideoCapture cap(name);
+	//std::string sub = ".webm";
+	REPL(i, 0, number) {
+    //std::cout << std::to_string(i)+sub << std::endl;
+    //std::string name = std::to_string(i)+sub;
+    cv::VideoCapture cap(argv[i+2]);
 
 		caps.push_back(cap);
 	}
-	
+  //cv::VideoCapture cap(0);
+	//caps.push_back(cap);
 }
 
 void StitcherBase::free_feature() {

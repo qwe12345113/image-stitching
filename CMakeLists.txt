@@ -20,6 +20,7 @@ find_package(Eigen3 REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third-party/)
 
+add_definitions(-O3 -march=native -Wall -Wextra)
 add_definitions(${EIGEN3_DEFINITIONS})
 include_directories(${EIGEN3_INCLUDE_DIRS})
 

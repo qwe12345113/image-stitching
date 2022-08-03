@@ -2,7 +2,8 @@
 //Author: Yuxin Wu <ppwwyyxx@gmail.com>
 
 #pragma once
-
+#include <vector>
+#include <opencv2/opencv.hpp>
 #include "stitcherbase.hh"
 #include "stitcher_image.hh"
 #include "common/common.hh"
@@ -27,6 +28,7 @@ class CylinderStitcher : public StitcherBase {
 		// in cylindrical mode, perspective correction on the final image
 		Mat32f perspective_correction(const Mat32f&);
 
+		
 	public:
 		template<typename U, typename X =
 			disable_if_same_or_derived<CylinderStitcher, U>>
@@ -37,7 +39,7 @@ class CylinderStitcher : public StitcherBase {
 			}
 
 		virtual Mat32f build();
-		virtual Mat32f build_new();
+		virtual Mat32f build_new();	
 		Mat32f build_stream();	
 };
 

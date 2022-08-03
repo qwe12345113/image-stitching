@@ -12,12 +12,16 @@
 #include "match_info.hh"
 #include "warp.hh"
 
+#include <opencv2/opencv.hpp>
+
 using namespace config;
 using namespace std;
 
 namespace pano {
 
 const static char* HOMOGRAPHY_DUMP = "parameter";
+
+bool once = true;
 
 Mat32f CylinderStitcher::build() {
     calc_feature();	  
@@ -31,19 +35,24 @@ Mat32f CylinderStitcher::build() {
 }
 
 Mat32f CylinderStitcher::build_new() {
+	//cv::Mat image = cv::imread("4.jpg");
+	cv::Mat tmp;
+	
 	if(LOADHOMO){
-          REP(k, (int)imgs.size()){
-    	    imgs[k].load();
-          }
-          bundle.identity_idx = imgs.size() >> 1;
-          bundle.load_homography(HOMOGRAPHY_DUMP);
-        }
-        else{
-          calc_feature();	  
-          bundle.identity_idx = imgs.size() >> 1;
-	  build_warp();
-	  free_feature();
-        }
+
+        REP(k, (int)imgs.size()){
+    		imgs[k].load();
+        }	
+		
+        bundle.identity_idx = imgs.size() >> 1;
+        bundle.load_homography(HOMOGRAPHY_DUMP);
+    }
+    else{
+        calc_feature();	  
+        bundle.identity_idx = imgs.size() >> 1;
+	    build_warp();
+	    free_feature();
+    }
 
 	bundle.proj_method = ConnectedImages::ProjectionMethod::flat;
 	bundle.update_proj_range();
@@ -59,17 +68,20 @@ Mat32f CylinderStitcher::build_stream() {
 		caps[i] >> tmp;
 		imgs[i].load_opencv(tmp);
 	}
-	
-    bundle.identity_idx = imgs.size() >> 1;
-    bundle.load_homography(HOMOGRAPHY_DUMP);
 
-	bundle.proj_method = ConnectedImages::ProjectionMethod::flat;
-	bundle.update_proj_range();
+	if(once){
+		bundle.identity_idx = imgs.size() >> 1;
+		bundle.load_homography(HOMOGRAPHY_DUMP);
+		bundle.proj_method = ConnectedImages::ProjectionMethod::flat;
+		bundle.update_proj_range();
+		once = false;
+	}
+
 	auto ret = bundle.blend();
 	return perspective_correction(ret);
 }
 
-void CylinderStitcher::build_warp() {;
+void CylinderStitcher::build_warp() {
 	GuardedTimer tm("build_warp()");
 	int n = imgs.size(), mid = bundle.identity_idx;
 	REP(i, n) bundle.component[i].homo = Homography::I();

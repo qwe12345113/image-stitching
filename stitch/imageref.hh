@@ -26,7 +26,7 @@ struct ImageRef {
     _width = img->width();
     _height = img->height();
   }
-
+  
   void load_opencv(cv::Mat img_cv){
     //print_debug("load opencv image");
     cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGBA);
