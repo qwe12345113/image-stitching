@@ -23,7 +23,6 @@ class StitcherBase {
 			>::type;
 
 		std::vector<ImageRef> imgs;
-
 		// feature and keypoints of each image
     // feats[k][i].coor == keypoints[k][i]
     // keypoints only work as a storage of feats, because feats will be freed
