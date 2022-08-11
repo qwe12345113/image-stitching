@@ -28,28 +28,21 @@ struct ImageRef {
     _height = img->height();
   }
   
-  void load_mat32f(Mat32f LRimg) 
-  {
-    cout << "new0" << endl;
-    // img = new Mat32f{LRimg};
-    //auto test = new Mat32f(LRimg.rows(), LRimg.cols(), 3);
-    //Mat32f img1 = Mat32f(LRimg.rows(), LRimg.cols(),3);
-    //img = new Mat32f{img1};
-    img = &LRimg;
-    cout << "new1" << endl;
-
-    // REP(i, LRimg.rows()){
-    //   std::cout << "img->ptr" << std::endl;
-    //   float* dst = img->ptr(i);
-    //   std::cout << "LRimg.ptr" << std::endl;
-		//   const float* src = LRimg.ptr(i);
-    //   std::cout << "memcpy" << std::endl;
-    //   memcpy(dst, src, sizeof(float) * LRimg.cols()*3);
-    // }
-    std::cout << "new0" << std::endl;
-
-    _width = img->width();
-    _height = img->height();
+  void load_mat32f(Mat32f LRimg) {
+      if (img) 
+        return;
+      Mat32f *mat = new Mat32f(LRimg.height(), LRimg.width(), 3);
+      REP(i, LRimg.height())
+        REP(j, LRimg.width()){
+          mat->at(i, j, 0) = LRimg.at(i, j, 0);
+          mat->at(i, j, 1) = LRimg.at(i, j, 1);
+          mat->at(i, j, 2) = LRimg.at(i, j, 2);
+        }
+      delete img;
+      
+      img = mat;
+      _width = img->width();
+      _height = img->height();
   }
 
   void load_opencv(cv::Mat img_cv){

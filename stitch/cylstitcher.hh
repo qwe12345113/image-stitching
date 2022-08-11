@@ -40,7 +40,8 @@ class CylinderStitcher : public StitcherBase {
 			}
 
 		virtual Mat32f build();
-		virtual Mat32f build_new(const char*);
+		virtual Mat32f build_new(const char*, Mat32f, Mat32f);
+		virtual Mat32f build_new2(const char*);
 		// virtual Mat32f build_new();
 		//Mat32f build_2(Mat32f, Mat32f);
 		// Mat32f build_2(cv::Mat, cv::Mat);

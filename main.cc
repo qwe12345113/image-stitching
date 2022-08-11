@@ -266,7 +266,7 @@ void work(int argc, char* argv[]) {
 	// 	//res = p.build();
 	// }
 	p = new CylinderStitcher(move(imgs));
-    res = p->build_new("parameter");
+    res = p->build_new2("parameter");
 
 	Mat32f crop_res;
 	if (CROP) {
@@ -310,7 +310,7 @@ void work(int argc, char* argv[]) {
 	// StitcherBase *p1;
 	
 	CylinderStitcher *p1 = new CylinderStitcher(move(imgs1));
-	res1 = p1->build_new("parameter2");
+	res1 = p1->build_new2("parameter2");
 	//res = p->build_new();
 	int oldw = res1.width(), oldh = res1.height();
 	crop_res1 = crop(res1);
@@ -338,9 +338,12 @@ void loop(int argc, char* argv[]) {
 	p->load_stream(imgs.size(), argv);
 
 	/*for surround view img*/
+	
+
 	vector<string> imgs1;
-	imgs1.emplace_back("./right.jpg");
-	imgs1.emplace_back("./left.jpg");
+	REP(i, 2) imgs1.emplace_back(" ");
+	// imgs1.emplace_back("./right.jpg");
+	// imgs1.emplace_back("./left.jpg");
 
 	Mat32f res1;
 	Mat32f crop_res1;
@@ -388,7 +391,7 @@ void loop(int argc, char* argv[]) {
 		// imgs1.emplace_back("./left.jpg");
 		// CylinderStitcher *p1 = new CylinderStitcher(move(imgs1));
 		
-		res1 = p1->build_new("parameter2");
+		res1 = p1->build_new("parameter2", right, left);
 		// crop_res1 = crop(res1);
 		// std::cout << "final " << res1.width() << " " << res1.height() << endl;
 		cout << ((double)clock() - Start)/CLOCKS_PER_SEC << endl;
@@ -420,7 +423,7 @@ void test(int argc, char* argv[]) {
 	Mat32f res;
 	StitcherBase *p;
 	p = new CylinderStitcher(move(imgs));
-	res = p->build_new("parameter");
+	res = p->build_new2("parameter");
 	//res = p->build_new();
 	if (CROP) {
 		int oldw = res.width(), oldh = res.height();
@@ -450,7 +453,7 @@ void test2(int argc, char* argv[]) {
 	StitcherBase *p;
 	p = new CylinderStitcher(move(imgs));	
 	//res = p->build_new("parameter2");
-	res = p->build_new("parameter2");
+	res = p->build_new2("parameter2");
 	if (CROP) {
 		int oldw = res.width(), oldh = res.height();
 		res = crop(res);

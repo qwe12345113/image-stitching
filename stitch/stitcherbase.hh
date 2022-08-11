@@ -57,7 +57,8 @@ class StitcherBase {
 		StitcherBase& operator = (const StitcherBase&) = delete;
 
 		virtual Mat32f build() = 0;
-		virtual Mat32f build_new(const char* file_name) = 0;
+		virtual Mat32f build_new(const char* file_name, Mat32f right, Mat32f left) = 0;
+		virtual Mat32f build_new2(const char* file_name) = 0;
 		void load_stream(int number, char* argv[]);
 
 		virtual ~StitcherBase() = default;

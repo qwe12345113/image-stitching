@@ -35,7 +35,24 @@ Mat32f CylinderStitcher::build() {
 	return perspective_correction(ret);
 }
 
-Mat32f CylinderStitcher::build_new(const char* file_name) {
+Mat32f CylinderStitcher::build_new2(const char* file_name) {
+	cv::Mat tmp;
+	REP(k, (int)imgs.size()){
+		imgs[k].load();
+	}
+	if(once1){
+		bundle.identity_idx = imgs.size() >> 1;
+		bundle.load_homography(file_name);
+		bundle.proj_method = ConnectedImages::ProjectionMethod::flat;
+		bundle.update_proj_range();
+		once1 = false;
+	}
+
+	auto ret = bundle.blend();
+	return perspective_correction(ret);
+}
+
+Mat32f CylinderStitcher::build_new(const char* file_name, Mat32f right, Mat32f left) {
 //Mat32f CylinderStitcher::build_new() {
 	//cv::Mat image = cv::imread("4.jpg");
 	// cv::Mat tmp;
@@ -60,9 +77,11 @@ Mat32f CylinderStitcher::build_new(const char* file_name) {
 	// return perspective_correction(ret);
 
 	cv::Mat tmp;
-	REP(k, (int)imgs.size()){
-		imgs[k].load();
-	}
+	// REP(k, (int)imgs.size()){
+	// 	imgs[k].load();
+	// }
+	imgs[0].load_mat32f(right);
+	imgs[1].load_mat32f(left);
 
 	if(once1){
 		bundle.identity_idx = imgs.size() >> 1;
