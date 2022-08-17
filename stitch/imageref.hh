@@ -9,7 +9,7 @@
 #include "lib/imgproc.hh"
 #include "match_info.hh"
 #include "common/common.hh"
-using namespace std;
+#include <iostream>
 namespace pano {
 // A transparent reference to a image in file
 struct ImageRef {
@@ -28,10 +28,34 @@ struct ImageRef {
     _height = img->height();
   }
   
+  void load_opencv(cv::Mat img_cv){
+    //print_debug("load opencv image");
+    if (img) delete img;
+    cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGBA);
+	  unsigned w = img_cv.cols, h = img_cv.rows;
+	  Mat32f *mat = new Mat32f(h, w, 3);
+
+	  unsigned npixel = w * h;
+	  float* p = mat->ptr();
+	  unsigned char* data = img_cv.data;
+
+	  REP(i, npixel) {
+		  *(p++) = *(data++) / 255.0;
+		  *(p++) = *(data++) / 255.0;
+		  *(p++) = *(data++) / 255.0;
+		  data++;	// rgba
+	  }
+	  img = mat;
+    _width = w;
+    _height = h;
+  }
+
   void load_mat32f(Mat32f LRimg) {
-      if (img) 
-        return;
+      //if (img) delete img;
+      // if (img)
+      //   return;
       Mat32f *mat = new Mat32f(LRimg.height(), LRimg.width(), 3);
+  #pragma omp parallel for schedule(dynamic)
       REP(i, LRimg.height())
         REP(j, LRimg.width()){
           mat->at(i, j, 0) = LRimg.at(i, j, 0);
@@ -45,26 +69,22 @@ struct ImageRef {
       _height = img->height();
   }
 
-  void load_opencv(cv::Mat img_cv){
-    //print_debug("load opencv image");    
-    cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGBA);    
-	  unsigned w = img_cv.cols, h = img_cv.rows;
-    cout << w << " " << h << endl;
-	  Mat32f *mat = new Mat32f(h, w, 3); 
-	  unsigned npixel = w * h;    
-	  float* p = mat->ptr();
-	  unsigned char* data = img_cv.data;
-    
-	  REP(i, npixel) {
-		  *(p++) = (float)*(data++) / 255.0;
-		  *(p++) = (float)*(data++) / 255.0;
-		  *(p++) = (float)*(data++) / 255.0;
-		  data++;	// rgba
-	  }
-
-	  img = mat;
-    _width = w;
-    _height = h;
+  void cropped(int startX, int startY, int width, int height){
+    //std::cout << "1. " << startX + width << ", " << startY + height << std::endl;
+    //std::cout << "2. "<< _width << ", " << _height << std::endl;
+    if(startX + width > _width || startY + height > _height) error_exit("Failed to crop image\n");
+    Mat32f *mat = new Mat32f(height, width, 3);
+  #pragma omp parallel for schedule(dynamic) 
+    REP(i, height)
+			REP(j, width) {
+        mat->at(i, j, 0) = img->at(i+startY, j+startX, 0);
+				mat->at(i, j, 1) = img->at(i+startY, j+startX, 1);
+				mat->at(i, j, 2) = img->at(i+startY, j+startX, 2);
+      }
+    delete img;
+    img = mat;
+    _width = width;
+    _height = height;
   }
 
   void release() { if (img) delete img; img = nullptr; }

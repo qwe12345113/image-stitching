@@ -206,7 +206,7 @@ bool TransformEstimation::fill_inliers_to_matchinfo(
   double area = polygon_area(overlap);
   double area1 = shape1.w * shape1.h, area2 = shape2.w * shape2.h;
   print_debug("OverlapArea=%.0lf, ImageArea=%.0lf\n", area, max(area1, area2));
-  if (area / max(area1, area2) < 0.15)
+  if (area / max(area1, area2) < 0.05)
     return false;
 
 	// fill in result

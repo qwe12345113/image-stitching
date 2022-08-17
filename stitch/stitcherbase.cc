@@ -3,6 +3,7 @@
 
 #include "stitcherbase.hh"
 #include "lib/timer.hh"
+#include "lib/imgproc.hh"
 #include <string>
 
 namespace pano {
