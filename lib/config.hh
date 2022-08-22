@@ -68,6 +68,7 @@ extern float LM_LAMBDA;
 extern int MULTIBAND;
 
 extern bool LOADHOMO;
+extern bool OPENCAM;
 
 // keep unchanged
 const float ORI_WINDOW_FACTOR = 1.5f;

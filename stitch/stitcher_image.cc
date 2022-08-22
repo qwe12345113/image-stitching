@@ -118,10 +118,8 @@ Mat32f ConnectedImages::blend() const {
   // it's hard to do coordinates.......
   auto proj2homo = get_proj2homo();
   Vec2D resolution = get_final_resolution();
-  
 
   Vec2D size_d = proj_range.size() / resolution;
-  // std::cout <<size_d << std::endl;
   Coor size(size_d.x, size_d.y);
   //print_debug("Final Image Size: (%d, %d)\n", size.x, size.y);
 
@@ -139,26 +137,18 @@ Mat32f ConnectedImages::blend() const {
   for (auto& cur : component) {
     Coor top_left = scale_coor_to_img_coor(cur.range.min);
     Coor bottom_right = scale_coor_to_img_coor(cur.range.max);
-    // print_debug("top_left: (%d, %d)\n", top_left.x, top_left.y);
-    // print_debug("bottom_right: (%d, %d)\n", bottom_right.x, bottom_right.y);
+    print_debug("top_left: (%d, %d)\n", top_left.x, top_left.y);
     blender->add_image(top_left, bottom_right, *cur.imgptr,
         [=,&cur](Coor t) -> Vec2D {
           Vec2D c = Vec2D(t.x, t.y) * resolution + proj_range.min;
           Vec homo = proj2homo(Vec2D(c.x, c.y));
-          // print_debug("proj, homo: (%f, %f)\n", c.x, homo.y);
           Vec ret = cur.homo_inv.trans(homo);
           if (ret.z < 0)
             return Vec2D{-10, -10};  // was projected to the other side of the lens, discard
           double denom = 1.0 / ret.z;
-          // std::cout << "Vec2D"<<std::endl;
-          // std::cout << Vec2D{ret.x*denom, ret.y*denom}<<std::endl;
-          // std::cout << "center"<<std::endl;
-          // std::cout <<cur.imgptr->shape().center() <<std::endl;
-          
           return Vec2D{ret.x*denom, ret.y*denom}
                 + cur.imgptr->shape().center();
         });
-    
   }
   //dynamic_cast<LinearBlender*>(blender.get())->debug_run(size.x, size.y);  // for debug
   return blender->run();
@@ -169,8 +159,12 @@ void ConnectedImages::save_homography(const char* fname) const {
   ofstream fout(fname);
   m_assert(fout.good());
   int n = component.size();
-  REP(i, n) REP(j, 9) {		
-	fout << component[i].homo.data[j] << " ";		
+  REP(i, n) REP(j, 9) {
+    if(j == 0 || j == 4 || j == 8) fout << 1 << " ";
+    else if(j == 2 && strcmp(fname, "parameter2") == 0) fout << component[i].homo.data[j]*2 << " ";
+    else if(j == 2) fout << component[i].homo.data[j] << " ";
+    else fout << 0 << " ";
+	//fout << component[i].homo.data[j] << " ";		
   }
   fout.close();
 }

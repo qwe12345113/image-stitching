@@ -10,6 +10,7 @@
 #include "match_info.hh"
 #include "common/common.hh"
 #include <iostream>
+#define IMGFILE(x) #x ".jpg"
 namespace pano {
 // A transparent reference to a image in file
 struct ImageRef {
@@ -31,6 +32,7 @@ struct ImageRef {
   void load_opencv(cv::Mat img_cv){
     //print_debug("load opencv image");
     if (img) delete img;
+    //cv::resize(img_cv, img_cv, cv::Size(1280, 720));
     cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGBA);
 	  unsigned w = img_cv.cols, h = img_cv.rows;
 	  Mat32f *mat = new Mat32f(h, w, 3);
@@ -45,23 +47,25 @@ struct ImageRef {
 		  *(p++) = *(data++) / 255.0;
 		  data++;	// rgba
 	  }
+    //std::cout << w << ", " << h << std::endl;
+
 	  img = mat;
     _width = w;
     _height = h;
   }
 
   void load_mat32f(Mat32f LRimg) {
-      //if (img) delete img;
-      // if (img)
-      //   return;
-      Mat32f *mat = new Mat32f(LRimg.height(), LRimg.width(), 3);
-  #pragma omp parallel for schedule(dynamic)
-      REP(i, LRimg.height())
-        REP(j, LRimg.width()){
-          mat->at(i, j, 0) = LRimg.at(i, j, 0);
-          mat->at(i, j, 1) = LRimg.at(i, j, 1);
-          mat->at(i, j, 2) = LRimg.at(i, j, 2);
-        }
+      //if (img)
+      //  return;
+      Mat32f *mat = new Mat32f{LRimg.clone()};
+  //     Mat32f *mat = new Mat32f(LRimg.height(), LRimg.width(), 3);
+  // #pragma omp parallel for schedule(dynamic)
+  //     REP(i, LRimg.height())
+  //       REP(j, LRimg.width()){
+  //         mat->at(i, j, 0) = LRimg.at(i, j, 0);
+  //         mat->at(i, j, 1) = LRimg.at(i, j, 1);
+  //         mat->at(i, j, 2) = LRimg.at(i, j, 2);
+  //       }
       delete img;
       
       img = mat;
@@ -74,6 +78,21 @@ struct ImageRef {
     //std::cout << "2. "<< _width << ", " << _height << std::endl;
     if(startX + width > _width || startY + height > _height) error_exit("Failed to crop image\n");
     Mat32f *mat = new Mat32f(height, width, 3);
+    // REP(i, left.height())
+    // {
+    //   float* dst = left.ptr(i, 0);
+    //   const float* src = res.ptr(i);
+    //   memcpy(dst, src, 3 * left.width() * sizeof(float));
+    // }
+    // std::cout << "123" << std::endl;
+    // REP(i, height){
+    //   float* dst = mat->ptr(i, 0);
+    //   const float* src = img->ptr(i+startY);
+    //   memcpy(dst, src, 3 * (width - startX) * sizeof(float));
+    // }
+    // std::cout << "456" << std::endl;
+    // write_rgb(IMGFILE(out), mat);
+    // std::cout << "789" << std::endl;
   #pragma omp parallel for schedule(dynamic) 
     REP(i, height)
 			REP(j, width) {

@@ -63,10 +63,16 @@ Mat32f opencv2img(cv::Mat img) {
 }
 
 cv::Mat img2opencv(Mat32f img) {
-
+	//GuardedTimer tm("img2opencv");
 	int w = img.cols(), h = img.rows();
 	cv::Mat res(h, w, CV_8UC3);
-#pragma omp parallel for schedule(dynamic)
+
+	// REP(i, height){
+    //   float* dst = mat->ptr(i, 0);
+    //   const float* src = img->ptr(i+startY);
+    //   memcpy(dst, src, 3 * (width - startX) * sizeof(float));
+    // }
+
 	REP(i, h)
 		REP(j, w) {
 			res.ptr(i,j)[0] = img.at(i, j, 2) * 255.0;
@@ -287,6 +293,23 @@ void work(int argc, char* argv[]) {
 }
 
 void loop(int argc, char* argv[]) {
+	
+	// float K[3][3] = {439.8081431898627, -1.11273685072125, 657.1262692712136, 0.0, 438.94230771583267, 398.84726805778035, 0., 0., 1.};
+	// float D[4][1] = {-0.05426531284660334, 0.042009650323603445, -0.023596004020591154, 0.0046584199928515774};
+	// cv::Mat camMat = cv::Mat(3,3,CV_32FC1, K);
+	// cv::Mat distortion = cv::Mat(4, 1, CV_32FC1, D);
+	
+	// cv::Mat map[2];
+	// cv::fisheye::initUndistortRectifyMap(
+	// 	camMat, distortion, cv::Matx33d::eye(), camMat, cv::Size(1280, 800), CV_16SC2, map[0], map[1]
+	// );
+
+	LAZY_READ = 0;
+	ifstream fin("crop");
+	int shift = 100;
+  	if(!fin.is_open())
+    	error_exit("Parameter file can not read, please check file existed.\n");
+	fin >> shift;
 
  	std::cout << "loop start" << std::endl;
 	vector<string> imgs, imgs1;	
@@ -294,27 +317,30 @@ void loop(int argc, char* argv[]) {
 	REP(i, 2) imgs1.emplace_back(" ");
 
 	Mat32f res;
-	
 	CylinderStitcher *p = new CylinderStitcher(move(imgs)), *q = new CylinderStitcher(move(imgs1));
 	std::cout << "load stream" << std::endl;
-	p->load_stream(imgs.size(), argv);		
-
-	while(char(cv::waitKey(1)) != 'q'){
-		res = p->build_stream();
-		if (CROP) {
-			//int oldw = res.width(), oldh = res.height();
-			res = crop(res);
-			//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
-		}
+	if(OPENCAM) p->load_camera(imgs.size());
+	else p->load_stream(imgs.size(), argv);
+	p->Calibrate();
+	while(char(cv::waitKey(30)) != 'q'){
+		GuardedTimer tm("build_stream");
+		// res = p->build_stream(shift, map[0], map[1]);
+		res = p->build_stream(shift);
+		// if (CROP) {
+		// 	//int oldw = res.width(), oldh = res.height();
+		// 	res = crop(res);
+		// 	//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
+		// }
 		Mat32f left(res.height(), int(res.width() / 2), 3);
 		Mat32f right(res.height(), int(res.width() / 2), 3);
+
 		REP(i, left.height())
 		{
 			float* dst = left.ptr(i, 0);
 			const float* src = res.ptr(i);
 			memcpy(dst, src, 3 * left.width() * sizeof(float));
 		}
-		REP(i, right.height()) 
+		REP(i, right.height())
 		{
 			float* dst = right.ptr(i, 0);
 			const float* src = res.ptr(i, right.width());
@@ -328,7 +354,7 @@ void loop(int argc, char* argv[]) {
 			//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
 		}
 		cv::Mat image = img2opencv(res);
-		cv::resize(image, image, cv::Size(image.cols * 0.5, image.rows * 0.5));
+		//cv::resize(image, image, cv::Size(image.cols * 0.5, image.rows * 0.5));
 		cv::imshow("video window", image);
 	}
 	//writer.release();
@@ -377,38 +403,22 @@ void test(int argc, char* argv[]) {
 	}
 }
 
-// void parameter(int argc, char* argv[])
-// 	std::cout << "Generate parameter start!!" << std::endl;
-// 	vector<string> imgs, imgs1;
-// 	REPL(i, 2, argc) imgs.emplace_back(argv[i]);
-// 	imgs1.emplace_back(argv[argc-1]); imgs1.emplace_back(argv[2]); 
-// 	Mat32f res1, res2;
-// 	CylinderStitcher *p = new CylinderStitcher(move(imgs)), *q = new CylinderStitcher(move(imgs1));
-// 	std::cout << "Save parameter" << std::endl;
-// 	res1 = p->build_save("parameter");
-// 	res2 = q->build_save("parameter2");
-// 	//cv::Mat image = cv::imread("out.jpg");
-// 	cv::Mat image = img2opencv(res1);
-// 	cv::namedWindow("Test window");
-// 	cv::imshow("Test window", image);
-// 	cv::waitKey(0);
-// 	{
-// 		GuardedTimer tm("Writing image");
-// 		write_rgb(IMGFILE(result), res1);
-// 	}
-// }
-
 void parameter(int argc, char* argv[]) {
+
+	LAZY_READ = 1;
 	std::cout << "Generate parameter start!!" << std::endl;
 	vector<string> imgs, imgs1;
 	REPL(i, 2, argc) imgs.emplace_back(argv[i]);
 	imgs1.emplace_back(argv[argc-1]); imgs1.emplace_back(argv[2]); 
-	Mat32f res;
+	Mat32f res, res2;
+	cv::Mat image = cv::imread(argv[2]);
+	int times = image.cols * 0.03, crop = 0;
+	//std::cout << times << std::endl;
 	CylinderStitcher *p = new CylinderStitcher(move(imgs)), 
 					 *q = new CylinderStitcher(move(imgs1));
-	for(int i = 0;i < 20;i++){
-		sleep(1);
-		if(!p->build_save("parameter", res))
+	for(int i = 0;i < times;i++){
+		sleep(0.1);
+		if(!p->build_save("parameter", res) || !q->build_save("parameter2", res2))
 			continue;
 		//q->build_save("parameter2");
 		//cv::Mat image = cv::imread("out.jpg");
@@ -417,9 +427,15 @@ void parameter(int argc, char* argv[]) {
 			string name = "result" + to_string(i) + ".jpg";
 			GuardedTimer tm("Writing image");
 			write_rgb(name, res);
+			write_rgb("test.jpg", res2);
+			crop = i;
 		}
 	}
-	
+	std::cout << crop * 5 << std::endl;
+	ofstream fout("crop");
+    m_assert(fout.good());
+	fout << crop * 5;
+	fout.close();
 }
 
 void init_config() {
@@ -477,6 +493,7 @@ void init_config() {
 	CFG(MULTIPASS_BA);
 	CFG(MULTIBAND);
 	CFG(LOADHOMO);
+	CFG(OPENCAM);
 #undef CFG
 }
 
@@ -557,4 +574,3 @@ int main(int argc, char* argv[]) {
 	*/
 	return 0;
 }
-

@@ -37,12 +37,34 @@ void StitcherBase::load_stream(int number, char*argv[]) {
 	REPL(i, 0, number) {
     //std::cout << std::to_string(i)+sub << std::endl;
     //std::string name = std::to_string(i)+sub;
-    cv::VideoCapture cap(argv[i+2]);
-
-		caps.push_back(cap);
+    caps[i].open(argv[i+2]);
 	}
   //cv::VideoCapture cap(0);
 	//caps.push_back(cap);
+}
+
+void StitcherBase::load_camera(int number) {
+	
+	//std::string sub = ".webm";
+  std::cout << "load camera" << std::endl;
+  /*caps[0].open(0);
+  caps[1].open(1);
+  caps[2].open(2);
+  caps[3].open(3);
+  */
+  caps[0].open(0, cv::CAP_V4L2);
+  caps[1].open(3, cv::CAP_V4L2);
+  caps[2].open(1, cv::CAP_V4L2);
+  caps[3].open(2, cv::CAP_V4L2);
+	for(int i = 0;i < number;i++){
+    caps[i].set(cv::CAP_PROP_FPS, 30);
+    caps[i].set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    caps[i].set(cv::CAP_PROP_FRAME_HEIGHT, 800);
+    caps[i].set(cv::CAP_PROP_CONVERT_RGB, 1);
+	}
+  //cv::VideoCapture cap(0);
+	//caps.push_back(cap);
+  std::cout << "load camera end" << std::endl;
 }
 
 void StitcherBase::free_feature() {

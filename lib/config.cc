@@ -82,5 +82,6 @@ float SLOPE_PLAIN;
 int MULTIBAND;
 
 bool LOADHOMO;
+bool OPENCAM;
 
 }

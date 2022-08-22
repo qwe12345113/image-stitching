@@ -72,7 +72,7 @@ Mat32f MultiBandBlender::run() {
 		if (!is_last)
 			create_next_level(level);
 		//debug_level(level);
-#pragma omp parallel for schedule(dynamic)
+//#pragma omp parallel for schedule(dynamic)
 		REP(i, target_size.y) REP(j, target_size.x) {
 			Color isum(0, 0, 0);
 			float wsum = 0;

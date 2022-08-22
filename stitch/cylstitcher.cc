@@ -24,12 +24,17 @@ const static char* HOMOGRAPHY_DUMP2 = "parameter2";
 
 bool once = true;
 bool once1 = true;
+cv::Mat map[2];
 
-
-float K[3][3] = {4.3385169304417246e+02, 0., 6.4280797725192724e+02, 0., 4.3348666658915528e+02, 4.0765018997465529e+02, 0., 0., 1.};
-cv::Mat camMat = cv::Mat(3,3,CV_32FC1,K);
-float D[4][1] = {-2.0220421067169928e-02, 3.9218725422658467e-03, -9.4308390338283324e-03, 3.0740906352361300e-03};
-cv::Mat distortion = cv::Mat(4, 1, CV_32FC1,D);
+void CylinderStitcher::Calibrate(){
+	float K[3][3] = {439.8081431898627, -1.11273685072125, 657.1262692712136, 0.0, 438.94230771583267, 398.84726805778035, 0., 0., 1.};
+	float D[4][1] = {-0.05426531284660334, 0.042009650323603445, -0.023596004020591154, 0.0046584199928515774};
+	cv::Mat camMat = cv::Mat(3,3,CV_32FC1, K);
+	cv::Mat distortion = cv::Mat(4, 1, CV_32FC1, D);
+	cv::fisheye::initUndistortRectifyMap(
+		camMat, distortion, cv::Matx33d::eye(), camMat, cv::Size(1280, 800), CV_16SC2, map[0], map[1]
+	);
+}
 
 Mat32f CylinderStitcher::build() {
     calc_feature();	  
@@ -44,7 +49,6 @@ Mat32f CylinderStitcher::build() {
 }
 
 Mat32f CylinderStitcher::build_new() {
-	
 	if(LOADHOMO){
         REP(k, (int)imgs.size()){
     		imgs[k].load();
@@ -64,11 +68,13 @@ Mat32f CylinderStitcher::build_new() {
 	bundle.proj_method = ConnectedImages::ProjectionMethod::flat;
 	bundle.update_proj_range();
 	auto ret = bundle.blend();
-	return perspective_correction(ret);
+	return ret;
+	//return perspective_correction(ret);
 }
 
 Mat32f CylinderStitcher::build_two_image(Mat32f right, Mat32f left) {
-	GuardedTimer tm("build_two_image()");
+	
+	//GuardedTimer tm("build twoImg");
     imgs[0].load_mat32f(right);
 	imgs[1].load_mat32f(left);
 
@@ -79,10 +85,9 @@ Mat32f CylinderStitcher::build_two_image(Mat32f right, Mat32f left) {
 		bundle.update_proj_range();
 		once1 = false;
 	}
-
-	auto ret = bundle.blend();
-	// return perspective_correction(ret);
-	return ret;
+	return bundle.blend();
+	//auto ret = bundle.blend();
+	//return perspective_correction(ret);
 }
 
 bool CylinderStitcher::build_save(const char* filename, Mat32f& mat) {
@@ -119,20 +124,22 @@ Mat32f CylinderStitcher::build_load(const char* filename) {
 	return perspective_correction(ret);
 }
 
-Mat32f CylinderStitcher::build_stream() {
-	GuardedTimer tm("build_stream()");
-	cv::Mat tmp;
-	cv::Mat undistortImg;
-	cv::Mat map[2];
+// Mat32f CylinderStitcher::build_stream(int shift, cv::Mat* map) {
+Mat32f CylinderStitcher::build_stream(int shift) {
+	//GuardedTimer tm("build_stream");
+	cv::Mat tmp[(int)imgs.size()], croptmp[(int)imgs.size()];	
+	cv::Mat undistortImg[(int)imgs.size()];
+
+#pragma omp parallel for schedule(dynamic)
 	REP(i, (int)imgs.size()){
-		caps[i] >> tmp;
-		// cv::fisheye::initUndistortRectifyMap(
-		// 	camMat, distortion, cv::Matx33d::eye(), camMat, cv::Size(1280, 800), CV_16SC2, map[0], map[1]
-		// );		
-		// cv::remap(tmp, undistortImg,
-		// 	map[0], map[1], cv::INTER_LINEAR, cv::BORDER_CONSTANT);
-		//cv::resize(undistortImg, undistortImg, cv::Size(1280, 800));
-		imgs[i].load_opencv(tmp);		
+		caps[i] >> tmp[i];
+		
+		cv::remap(tmp[i], undistortImg[i],
+			map[0], map[1], cv::INTER_LINEAR, cv::BORDER_CONSTANT);	
+
+		// cv::Rect cropROI(shift, 0, tmp.cols-shift*2, tmp.rows);
+		// croptmp = undistortImg(cropROI);
+		imgs[i].load_opencv(undistortImg[i]);
 	}
 
 	if(once){
@@ -150,7 +157,7 @@ Mat32f CylinderStitcher::build_stream() {
 }
 
 void CylinderStitcher::build_warp() {
-	//GuardedTimer tm("build_warp()");
+	GuardedTimer tm("build_warp()");
 	int n = imgs.size(), mid = bundle.identity_idx;
 	REP(i, n) bundle.component[i].homo = Homography::I();
 
@@ -208,7 +215,7 @@ void CylinderStitcher::build_warp() {
 }
 
 bool CylinderStitcher::build_warp2() {
-	//GuardedTimer tm("build_warp()");
+	GuardedTimer tm("build_warp()");
 	int n = imgs.size(), mid = bundle.identity_idx;
 	REP(i, n) bundle.component[i].homo = Homography::I();
 
@@ -371,7 +378,10 @@ int shift = 5;
   	REP(k, (int)imgs.size()) {
 		imgs[k].load();		
 		imgs[k].cropped(shift, 0, imgs[k]._width-(shift*2), imgs[k]._height);
-		write_rgb(std::to_string(k+1) + ".jpg", *imgs[k].img);
+		//std::cout << imgs[k].fname << std::endl;
+		write_rgb(imgs[k].fname, *imgs[k].img);
+		//write_rgb(std::to_string(k+1) + ".png", *imgs[k].img);
+		imgs[k].release();
   	}
 
 }
