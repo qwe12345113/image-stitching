@@ -54,7 +54,7 @@ struct ImageRef {
   
   void load_opencv_uc(cv::Mat img_cv, int shift) {
     if (imguc) delete imguc;
-    cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGB);
+    // cv::cvtColor(img_cv, img_cv, cv::COLOR_BGR2RGB);
     int w = img_cv.cols-2*shift, h = img_cv.rows;
     Matuc *mat = new Matuc(h, w, 3);
 
@@ -68,6 +68,7 @@ struct ImageRef {
     _width = w;
     _height = h;
   }
+
   void load_mat32f(Mat32f LRimg) {
       release();
       img = new Mat32f{LRimg.clone()};;

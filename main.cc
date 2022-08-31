@@ -84,7 +84,7 @@ cv::Mat img2opencv_uc(Matuc img) {
     int w = img.cols(), h = img.rows();	
     cv::Mat res(h, w, CV_8UC3);
     memcpy(res.ptr(), img.ptr(), sizeof(unsigned char)*w*h*3);
-    cv::cvtColor(res, res, cv::COLOR_BGR2RGB);
+    // cv::cvtColor(res, res, cv::COLOR_BGR2RGB);
     return res;
 }
 
