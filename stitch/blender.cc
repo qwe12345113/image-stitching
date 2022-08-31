@@ -7,10 +7,9 @@
 #include "lib/config.hh"
 #include "lib/imgproc.hh"
 #include "lib/timer.hh"
-#include "lib/geometry.hh"
 using namespace std;
 using namespace config;
-#define IMGFILE(x) #x ".jpg"
+
 namespace pano {
 
 void LinearBlender::add_image(
@@ -24,17 +23,14 @@ void LinearBlender::add_image(
 
 Mat32f LinearBlender::run() {
 	Mat32f target(target_size.y, target_size.x, 3);
-	//print_debug("target: (%d, %d)\n", target.height(), target.width());
-	//write_rgb(IMGFILE(target), target);
+
 #define GET_COLOR_AND_W \
 					Vec2D img_coor = img.map_coor(i, j); \
 					if (img_coor.isNaN()) continue; \
 					float r = img_coor.y, c = img_coor.x; \
-					auto color = interpolate(*img.imgref.img, r, c); \
+					auto color = Color(img.imgref.img->ptr(r, c));\
 					if (color.x < 0) continue; \
 					float	w = 0.5 - fabs(c / img.imgref.width() - 0.5); \
-					if (not config::ORDERED_INPUT) /* blend both direction */\
-						w *= (0.5 - fabs(r / img.imgref.height() - 0.5)); \
 					color *= w
 
 	if (LAZY_READ) {
@@ -76,65 +72,85 @@ Mat32f LinearBlender::run() {
 				}
 			}
 		}
-	} 
-	else {
-		//GuardedTimer tm("blend"); //test time
-		fill(target, Color::NO);
-/* 
-test 
-#pragma omp parallel for schedule(dynamic)
-		for (auto& img : images){
-			// print_debug("images.size(): (%ld, %ld, %ld, %ld)\n", 
- 			// 		img.range.min.x, img.range.max.x, img.range.min.y, img.range.max.y);
-		#pragma omp parallel for schedule(dynamic)
-			for (int i = img.range.min.y; i < img.range.max.y; i ++) {				
-				for (int j = img.range.min.x; j < img.range.max.x; j ++) {
-					if (target.at(i,j, 0)==-1)
-					// if (target.at(i,j, 0)==-1 || target.at(i,j,1)==-1 || target.at(i,j,2)==-1)
-					{
-						target.at(i, j, 0) = img.imgref.img->at(i, j-img.range.min.x, 0);
-						target.at(i, j, 1) = img.imgref.img->at(i, j-img.range.min.x, 1);
-						target.at(i, j, 2) = img.imgref.img->at(i, j-img.range.min.x, 2);
-					}
-					else
-					{
-						target.at(i, j, 0) = (target.at(i, j, 0) + img.imgref.img->at(i, j-img.range.min.x, 0)) / 2;
-						target.at(i, j, 1) = (target.at(i, j, 1) + img.imgref.img->at(i, j-img.range.min.x, 1)) / 2;
-						target.at(i, j, 2) = (target.at(i, j, 2) + img.imgref.img->at(i, j-img.range.min.x, 2)) / 2;
-					}
-				}
-			}
-		}
-		write_rgb(IMGFILE(target123), target);
-*/
+	} else {
+		fill(target, Color::BLACK);
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < target.height(); i ++) {
 			float *row = target.ptr(i);
 			for (int j = 0; j < target.width(); j ++) {
 				Color isum = Color::BLACK;
 				float wsum = 0;
-				for (auto& img : images) // 幾張img loop幾次
-				{					
-					// print_debug("img: (%d)\n", img.imgref.img);
-					// print_debug("images.size(): (%ld, %ld, %ld, %ld)\n", 
-					// img.range.min.x, img.range.max.x, img.range.min.y, img.range.max.y);
-					if (img.range.contain(i, j))//確認該點是否在img範圍內
-					{
-						GET_COLOR_AND_W;
-						isum += color;			
-						wsum += w;			
-					}
+				for (auto& img : images) if (img.range.contain(i, j)) {
+					GET_COLOR_AND_W;
+					isum += color;
+					wsum += w;
 				}
 				if (wsum > 0)	// keep original Color::NO
-					// print_debug("row: (%f)\n", *row);
-					// print_debug("row + j * 3: (%f)\n", row + j * 3);
 					(isum / wsum).write_to(row + j * 3);
 			}
 		}
 	}
-	//write_rgb(IMGFILE(target1), target);
-	//print_debug("target: (%d, %d)\n", target.height(), target.width());
 	return target;
+}
+
+Matuc LinearBlender::run_uc() {
+
+    int size = images.size();
+    int smoothShift = 6;
+    int smoothPixel = pow(2, smoothShift-1);
+    int minYPosition = 0, maxYPosition = 10000;
+    for (int z = 0; z < size; z++) {
+	    if (minYPosition < images[z].range.min.y) {
+		    minYPosition = images[z].range.min.y;
+	    }
+	    if (maxYPosition > images[z].range.max.y) {
+		    maxYPosition = images[z].range.max.y;
+	    }
+    }
+    //std::cout << "minY " << minYPosition << " maxY " << maxYPosition << std::endl; 
+    //Matuc target(target_size.y, target_size.x, 3);
+    Matuc target(maxYPosition-minYPosition, target_size.x, 3);
+    for (int z = 0; z < size; z++) {
+        int minXPosition, maxXPosition;
+        if (z==0) {
+            minXPosition = images[z].range.min.x;
+            maxXPosition = ((images[z].range.max.x+images[z+1].range.min.x)>>1)-smoothPixel;
+        } else if (z==(size-1)) {
+            minXPosition = ((images[z-1].range.max.x+images[z].range.min.x)>>1)+smoothPixel;
+            maxXPosition = images[z].range.max.x;
+        } else {
+            minXPosition = ((images[z-1].range.max.x+images[z].range.min.x)>>1)+smoothPixel;
+            maxXPosition = ((images[z].range.max.x+images[z+1].range.min.x)>>1)-smoothPixel;
+		}
+#pragma omp parallel for schedule(dynamic)
+        for (int i = images[z].range.min.y; i < images[z].range.max.y; i++) {
+			if (i >= minYPosition && i < maxYPosition) {
+				//std::cout << "image " << z << " minYPosition " << minYPosition << " image YPosition " << i << endl;
+				auto des = target.ptr(i-minYPosition, minXPosition);
+				auto src = images[z].imgref.imguc->ptr(i-images[z].range.min.y, minXPosition-images[z].range.min.x);
+				memcpy(des, src, sizeof(unsigned char)*(maxXPosition-minXPosition)*3);
+			}
+        }
+    }
+    for (int z = 0; z < (size-1); z++) {
+        int rightCenter = (images[z+1].range.min.x + images[z].range.max.x) >> 1;
+#pragma omp parallel for schedule(dynamic)
+        for (int i = images[z].range.min.y; i < images[z].range.max.y; i++) {
+			if (i >= minYPosition && i < maxYPosition) {
+				//std::cout << "2 minYPosition " << minYPosition << " image YPosition " << i << endl;
+				int count = 0;
+				for (int j=(rightCenter-smoothPixel); j<=(rightCenter+smoothPixel); j++) {
+					unsigned char* p = images[z].imgref.imguc->ptr(i-images[z].range.min.y, j-images[z].range.min.x);
+					unsigned char* q = images[z+1].imgref.imguc->ptr(i-images[z+1].range.min.y, j-images[z+1].range.min.x);
+					target.at(i-minYPosition, j, 0) = ((2*smoothPixel-count)*p[0]+count*q[0]) >> smoothShift;
+					target.at(i-minYPosition, j, 1) = ((2*smoothPixel-count)*p[1]+count*q[1]) >> smoothShift;
+					target.at(i-minYPosition, j, 2) = ((2*smoothPixel-count)*p[2]+count*q[2]) >> smoothShift;
+					count++;
+				}
+			}
+        }
+    }
+    return target;
 }
 
 }

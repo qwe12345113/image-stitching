@@ -90,6 +90,7 @@ class MultiBandBlender : public BlenderBase {
 			std::function<Vec2D(Coor)>) override;
 
 	Mat32f run() override;
+	Matuc run_uc() override;
 };
 
 }	// namespace pano

@@ -70,6 +70,9 @@ extern int MULTIBAND;
 extern bool LOADHOMO;
 extern bool OPENCAM;
 
+extern bool FISHEYE;
+extern bool VIDEO_WRITE;
+
 // keep unchanged
 const float ORI_WINDOW_FACTOR = 1.5f;
 const int ORI_HIST_BIN_NUM = 36;		// lowe

@@ -122,6 +122,11 @@ Mat32f MultiBandBlender::run() {
 	return target;
 }
 
+Matuc MultiBandBlender::run_uc() {
+        Matuc target(target_size.y, target_size.x, 3);
+	return target;
+}
+
 void MultiBandBlender::update_weight_map() {
 	GUARDED_FUNC_TIMER;
 #pragma omp parallel for schedule(dynamic, 100)

@@ -60,6 +60,7 @@ class StitcherBase {
 		virtual Mat32f build_new() = 0;
 		void load_stream(int number, char* argv[]);
 		void load_camera(int number);
+		void save_image(int number);
 		virtual ~StitcherBase() = default;
 };
 

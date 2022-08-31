@@ -84,4 +84,7 @@ int MULTIBAND;
 bool LOADHOMO;
 bool OPENCAM;
 
+bool FISHEYE;
+bool VIDEO_WRITE;
+
 }

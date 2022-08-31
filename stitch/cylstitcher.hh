@@ -19,9 +19,8 @@ class CylinderStitcher : public StitcherBase {
 		ConnectedImages bundle;
 
 		// build panorama with cylindrical pre-warping
-		void build_warp();
-		bool build_warp2();
-		
+		bool build_warp();
+
 		void crop_save();
 
 		// in cylindrical mode, search warping parameter for straightening
@@ -44,7 +43,9 @@ class CylinderStitcher : public StitcherBase {
 		virtual Mat32f build();
 		virtual Mat32f build_new();	
 		Mat32f build_stream(int);
+		Matuc build_stream_uc(int);
 		Mat32f build_two_image(Mat32f, Mat32f);
+		Matuc build_two_image_uc(Matuc, Matuc);
 		bool build_save(const char*, Mat32f&);
 		Mat32f build_load(const char*);
 };

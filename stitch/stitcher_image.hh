@@ -90,6 +90,7 @@ struct ConnectedImages {
 	void calc_inverse_homo();
 
 	Mat32f blend() const;
+	Matuc blend_uc() const;
 
 	Vec2D get_final_resolution() const;
 	

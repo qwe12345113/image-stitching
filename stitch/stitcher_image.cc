@@ -77,7 +77,6 @@ void ConnectedImages::update_proj_range() {
 }
 
 Vec2D ConnectedImages::get_final_resolution() const {
-  //cout << "projmin: " << proj_range.min << ", projmax: " << proj_range.max << endl;
 
   int refw = component[identity_idx].imgptr->width(),
       refh = component[identity_idx].imgptr->height();
@@ -89,7 +88,6 @@ Vec2D ConnectedImages::get_final_resolution() const {
       id_img_corner1 = identity_H.trans(Vec2D{-refw/2.0, -refh/2.0});
   // the range of the identity image
   Vec2D id_img_range = homo2proj(id_img_corner2) - homo2proj(id_img_corner1);
-  //cout << "Identity projection range: " << id_img_range << endl;
   if (proj_method != ProjectionMethod::flat) {
     if (id_img_range.x < 0)
       id_img_range.x = 2 * M_PI + id_img_range.x;
@@ -101,7 +99,6 @@ Vec2D ConnectedImages::get_final_resolution() const {
   Vec2D resolution = Vec2D(abs(id_img_range.x), abs(id_img_range.y)) / Vec2D(refw, refh),    // output-x-per-input-pixel, y-per-pixel
         target_size = proj_range.size() / resolution;
   double max_edge = max(target_size.x, target_size.y);
-  //print_debug("Target Image Size: (%lf, %lf)\n", target_size.x, target_size.y);
   if (max_edge > 80000 || target_size.x * target_size.y > 1e9)
     error_exit("Target size too large. Looks like a stitching failure!\n");
   // resize the result
@@ -109,7 +106,6 @@ Vec2D ConnectedImages::get_final_resolution() const {
     float ratio = max_edge / MAX_OUTPUT_SIZE;
     resolution *= ratio;
   }
-  //print_debug("Resolution: %lf,%lf\n", resolution.x, resolution.y);
   return resolution;
 }
 
@@ -137,7 +133,7 @@ Mat32f ConnectedImages::blend() const {
   for (auto& cur : component) {
     Coor top_left = scale_coor_to_img_coor(cur.range.min);
     Coor bottom_right = scale_coor_to_img_coor(cur.range.max);
-    print_debug("top_left: (%d, %d)\n", top_left.x, top_left.y);
+
     blender->add_image(top_left, bottom_right, *cur.imgptr,
         [=,&cur](Coor t) -> Vec2D {
           Vec2D c = Vec2D(t.x, t.y) * resolution + proj_range.min;
@@ -154,6 +150,45 @@ Mat32f ConnectedImages::blend() const {
   return blender->run();
 }
 
+Matuc ConnectedImages::blend_uc() const {
+  auto proj2homo = get_proj2homo();
+  Vec2D resolution = get_final_resolution();
+
+  Vec2D size_d = proj_range.size() / resolution;
+  Coor size(size_d.x, size_d.y);
+  //print_debug("Final Image Size: (%d, %d)\n", size.x, size.y);
+
+  auto scale_coor_to_img_coor = [&](Vec2D v) {
+    v = (v - proj_range.min) / resolution;
+    return Coor(v.x, v.y);
+  };
+
+  // blending
+  std::unique_ptr<BlenderBase> blender;
+  if (MULTIBAND > 0)
+    blender.reset(new MultiBandBlender{MULTIBAND});
+  else
+    blender.reset(new LinearBlender);
+  for (auto& cur : component) {
+    Coor top_left = scale_coor_to_img_coor(cur.range.min);
+    Coor bottom_right = scale_coor_to_img_coor(cur.range.max);
+
+    blender->add_image(top_left, bottom_right, *cur.imgptr,
+        [=,&cur](Coor t) -> Vec2D {
+          Vec2D c = Vec2D(t.x, t.y) * resolution + proj_range.min;
+          Vec homo = proj2homo(Vec2D(c.x, c.y));
+          Vec ret = cur.homo_inv.trans(homo);
+          if (ret.z < 0)
+            return Vec2D{-10, -10};  // was projected to the other side of the lens, discard
+          double denom = 1.0 / ret.z;
+          return Vec2D{ret.x*denom, ret.y*denom}
+                + cur.imgptr->shape().center();
+        });
+  }
+
+  return blender->run_uc();
+}
+
 void ConnectedImages::save_homography(const char* fname) const {
   print_debug("save homography matrix to %s\n", fname);
   ofstream fout(fname);
@@ -164,7 +199,6 @@ void ConnectedImages::save_homography(const char* fname) const {
     else if(j == 2 && strcmp(fname, "parameter2") == 0) fout << component[i].homo.data[j]*2 << " ";
     else if(j == 2) fout << component[i].homo.data[j] << " ";
     else fout << 0 << " ";
-	//fout << component[i].homo.data[j] << " ";		
   }
   fout.close();
 }
@@ -180,11 +214,7 @@ void ConnectedImages::load_homography(const char* fname) {
     fin >> component[i].homo.data[j];
   }
   fin.close();
-  /*REP(i, n) REP(j,9) {
-    cout << comp[i].homo.data[j] << " ";
-  }
-  cout << endl;*/
-  
+ 
   calc_inverse_homo();
 }
 

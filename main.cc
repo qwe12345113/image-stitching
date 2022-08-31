@@ -46,6 +46,7 @@ const int LABEL_LEN = 7;
 Mat32f opencv2img(cv::Mat img) {
 
 	cv::cvtColor(img, img, cv::COLOR_BGR2RGBA);
+	//cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 	unsigned w = img.cols, h = img.rows;
 	Mat32f mat(h, w, 3);
 	unsigned npixel = w * h;
@@ -63,16 +64,10 @@ Mat32f opencv2img(cv::Mat img) {
 }
 
 cv::Mat img2opencv(Mat32f img) {
-	//GuardedTimer tm("img2opencv");
+
 	int w = img.cols(), h = img.rows();
 	cv::Mat res(h, w, CV_8UC3);
-
-	// REP(i, height){
-    //   float* dst = mat->ptr(i, 0);
-    //   const float* src = img->ptr(i+startY);
-    //   memcpy(dst, src, 3 * (width - startX) * sizeof(float));
-    // }
-
+#pragma omp parallel for schedule(dynamic) 
 	REP(i, h)
 		REP(j, w) {
 			res.ptr(i,j)[0] = img.at(i, j, 2) * 255.0;
@@ -80,9 +75,17 @@ cv::Mat img2opencv(Mat32f img) {
 			res.ptr(i,j)[2] = img.at(i, j, 0) * 255.0;
 		}
 
-	// cv::cvtColor(res, res, cv::COLOR_BGR2RGBA);
+	//cv::cvtColor(res, res, cv::COLOR_BGR2RGBA);
 	return res;
 	
+}
+
+cv::Mat img2opencv_uc(Matuc img) {
+    int w = img.cols(), h = img.rows();	
+    cv::Mat res(h, w, CV_8UC3);
+    memcpy(res.ptr(), img.ptr(), sizeof(unsigned char)*w*h*3);
+    cv::cvtColor(res, res, cv::COLOR_BGR2RGB);
+    return res;
 }
 
 void test_extrema(const char* fname, int mode) {
@@ -273,44 +276,35 @@ void work(int argc, char* argv[]) {
 	REPL(i, 1, argc) imgs.emplace_back(argv[i]);
 	Mat32f res;
 	StitcherBase *p;
-	if (CYLINDER) {
-		p = new CylinderStitcher(move(imgs));		
-		//res = p.build();
-	} else {
-		p = new Stitcher(move(imgs));
-		//res = p.build();
-	}
-    res = p->build_new();
+	p = new CylinderStitcher(move(imgs));		
+
+	res = p->build();
 	if (CROP) {
 		int oldw = res.width(), oldh = res.height();
 		res = crop(res);
 		print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
 	}
+	
+	cv::Mat image = img2opencv(res);
+	cv::namedWindow("Test window");
+	
+	cv::imshow("Test window", image);
+	cv::waitKey(0);
 	{
 		GuardedTimer tm("Writing image");
 		write_rgb(IMGFILE(out), res);
 	}
+
 }
 
-void loop(int argc, char* argv[]) {
-	
-	// float K[3][3] = {439.8081431898627, -1.11273685072125, 657.1262692712136, 0.0, 438.94230771583267, 398.84726805778035, 0., 0., 1.};
-	// float D[4][1] = {-0.05426531284660334, 0.042009650323603445, -0.023596004020591154, 0.0046584199928515774};
-	// cv::Mat camMat = cv::Mat(3,3,CV_32FC1, K);
-	// cv::Mat distortion = cv::Mat(4, 1, CV_32FC1, D);
-	
-	// cv::Mat map[2];
-	// cv::fisheye::initUndistortRectifyMap(
-	// 	camMat, distortion, cv::Matx33d::eye(), camMat, cv::Size(1280, 800), CV_16SC2, map[0], map[1]
-	// );
+void loop_old(int argc, char* argv[]) {
 
 	LAZY_READ = 0;
 	ifstream fin("crop");
 	int shift = 100;
   	if(!fin.is_open())
-    	error_exit("Parameter file can not read, please check file existed.\n");
+    	error_exit("crop file can not read, please check file existed.\n");
 	fin >> shift;
-
  	std::cout << "loop start" << std::endl;
 	vector<string> imgs, imgs1;	
 	REPL(i, 2, argc) imgs.emplace_back(" ");
@@ -322,18 +316,19 @@ void loop(int argc, char* argv[]) {
 	if(OPENCAM) p->load_camera(imgs.size());
 	else p->load_stream(imgs.size(), argv);
 	p->Calibrate();
+
+	bool isColor = true;
+	cv::VideoWriter writer;
+    int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
+    double fps = 30.0;                          // framerate of the created video stream
+    string filename = "./live.avi";             // name of the output video file
+	bool once = true;
+
 	while(char(cv::waitKey(30)) != 'q'){
-		GuardedTimer tm("build_stream");
-		// res = p->build_stream(shift, map[0], map[1]);
+		GuardedTimer tm("LOOP");
 		res = p->build_stream(shift);
-		// if (CROP) {
-		// 	//int oldw = res.width(), oldh = res.height();
-		// 	res = crop(res);
-		// 	//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
-		// }
 		Mat32f left(res.height(), int(res.width() / 2), 3);
 		Mat32f right(res.height(), int(res.width() / 2), 3);
-
 		REP(i, left.height())
 		{
 			float* dst = left.ptr(i, 0);
@@ -347,19 +342,24 @@ void loop(int argc, char* argv[]) {
 			memcpy(dst, src, 3 * right.width() * sizeof(float));
 		}
 		res = q->build_two_image(right, left);
-		//sleep(1);
-		if (CROP) {
-			//int oldw = res.width(), oldh = res.height();
-			res = crop(res);
-			//print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
-		}
+		// if (CROP) {
+		// 	res = crop(res);
+		// }
 		cv::Mat image = img2opencv(res);
-		//cv::resize(image, image, cv::Size(image.cols * 0.5, image.rows * 0.5));
+		if(once){
+			writer.open(filename, codec, fps, image.size(), isColor);
+    		// check if we succeeded
+    		if (!writer.isOpened()) {
+        		cerr << "Could not open the output video file for write\n";
+        		return;
+    		}
+			once = false;
+		}
+		if(VIDEO_WRITE) writer.write(image);
+		cv::resize(image, image, image.size() / 2);
 		cv::imshow("video window", image);
 	}
-	//writer.release();
-	std::cout << "writer close" << std::endl;
-	delete p;
+	delete p;delete q;
 	{
 		GuardedTimer tm("Writing image");
 		write_rgb(IMGFILE(out), res);
@@ -367,16 +367,73 @@ void loop(int argc, char* argv[]) {
 
 }
 
+void loop(int argc, char* argv[]) {
+    LAZY_READ = 0;
+    ifstream fin("crop");
+    int shift = 100;
+    if(!fin.is_open())
+    	error_exit("Parameter file can not read, please check file existed.\n");
+    fin >> shift;
+    std::cout << "loop start" << std::endl;
+    vector<string> imgs, imgs1;
+    REPL(i, 2, argc) imgs.emplace_back(" ");
+    REP(i, 2) imgs1.emplace_back(" ");
+
+	Matuc res;
+    CylinderStitcher *p = new CylinderStitcher(move(imgs)), *q = new CylinderStitcher(move(imgs1));
+
+    std::cout << "load stream" << std::endl;
+    if(OPENCAM) p->load_camera(imgs.size());
+	else p->load_stream(imgs.size(), argv);
+	p->Calibrate();
+
+	bool isColor = true;
+	cv::VideoWriter writer;
+    int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
+    double fps = 30.0;                          // framerate of the created video stream
+    string filename = "./live.avi";             // name of the output video file
+	bool once = true;
+
+    while(char(cv::waitKey(1)) != 'q'){
+		GuardedTimer tm("LOOP");
+        res = p->build_stream_uc(shift);
+        Matuc left(res.height(), int(res.width() / 2), 3);
+        Matuc right(res.height(), int(res.width() / 2), 3);
+        REP(i, left.height()){
+            unsigned char* dst = left.ptr(i, 0);
+            unsigned char* src = res.ptr(i);
+            memcpy(dst, src, 3 * left.width() * sizeof(unsigned char));
+        }
+        REP(i, right.height()){
+            unsigned char* dst = right.ptr(i, 0);
+            unsigned char* src = res.ptr(i, right.width());
+            memcpy(dst, src, 3 * right.width() * sizeof(unsigned char));
+        }
+        res = q->build_two_image_uc(right, left);
+
+        cv::Mat image = img2opencv_uc(res);
+		// if (once) cout<< image.size() <<endl;
+		if(once && VIDEO_WRITE){
+			writer.open(filename, codec, fps, image.size(), isColor);
+    		// check if we succeeded
+    		if (!writer.isOpened()) {
+        		cerr << "Could not open the output video file for write\n";
+        		return;
+    		}
+			once = false;
+		}
+		if(VIDEO_WRITE) {
+			writer.write(image);
+		}
+
+        cv::resize(image, image, cv::Size(image.cols * 0.5, image.rows * 0.5));
+        cv::imshow("video window", image);
+    }
+	delete p;delete q;
+}
+
 void test(int argc, char* argv[]) {
-/*
- *  vector<Mat32f> imgs(argc - 1);
- *  {
- *    GuardedTimer tm("Read images");
- *#pragma omp parallel for schedule(dynamic)
- *    REPL(i, 1, argc)
- *      imgs[i-1] = read_img(argv[i]);
- *  }
- */
+	LAZY_READ = 1;
  	std::cout << "test start" << std::endl;
 	vector<string> imgs;
 	REPL(i, 2, argc) imgs.emplace_back(argv[i]);
@@ -384,14 +441,13 @@ void test(int argc, char* argv[]) {
 	StitcherBase *p;
 	p = new CylinderStitcher(move(imgs));		
 
-	res = p->build_new();
+	res = p->build();
 	if (CROP) {
 		int oldw = res.width(), oldh = res.height();
 		res = crop(res);
 		print_debug("Crop from %dx%d to %dx%d\n", oldw, oldh, res.width(), res.height());
 	}
 	
-	//cv::Mat image = cv::imread("out.jpg");
 	cv::Mat image = img2opencv(res);
 	cv::namedWindow("Test window");
 	
@@ -411,31 +467,51 @@ void parameter(int argc, char* argv[]) {
 	REPL(i, 2, argc) imgs.emplace_back(argv[i]);
 	imgs1.emplace_back(argv[argc-1]); imgs1.emplace_back(argv[2]); 
 	Mat32f res, res2;
-	cv::Mat image = cv::imread(argv[2]);
-	int times = image.cols * 0.03, crop = 0;
-	//std::cout << times << std::endl;
+
 	CylinderStitcher *p = new CylinderStitcher(move(imgs)), 
 					 *q = new CylinderStitcher(move(imgs1));
+	if(OPENCAM){
+		std::cout << "Save image!!" << std::endl;
+		p->load_camera(imgs.size());
+		p->save_image(imgs.size());
+		sleep(0.1);
+	}
+	cv::Mat image = cv::imread(argv[2]);
+	int times = image.cols * 0.03, crop = -1;
+	std::cout << times << std::endl;
 	for(int i = 0;i < times;i++){
 		sleep(0.1);
-		if(!p->build_save("parameter", res) || !q->build_save("parameter2", res2))
+		if(!p->build_save("parameter", res))
 			continue;
-		//q->build_save("parameter2");
-		//cv::Mat image = cv::imread("out.jpg");
-		//cv::Mat image = img2opencv(res);
+		Mat32f left(res.height(), int(res.width() / 2), 3);
+        Mat32f right(res.height(), int(res.width() / 2), 3);
+		REP(i, left.height()){
+            float* dst = left.ptr(i, 0);
+	        const float* src = res.ptr(i);
+	        memcpy(dst, src, 3 * left.width() * sizeof(float));
+	    }
+		REP(i, right.height()){
+	        float* dst = right.ptr(i, 0);
+        	const float* src = res.ptr(i, right.width());
+	        memcpy(dst, src, 3 * right.width() * sizeof(float));
+        }
+		if(!q->build_save("parameter2", res2))
+			continue;
 		{
 			string name = "result" + to_string(i) + ".jpg";
 			GuardedTimer tm("Writing image");
 			write_rgb(name, res);
-			write_rgb("test.jpg", res2);
+			//write_rgb("test.jpg", res2);
 			crop = i;
 		}
 	}
-	std::cout << crop * 5 << std::endl;
-	ofstream fout("crop");
-    m_assert(fout.good());
-	fout << crop * 5;
-	fout.close();
+	if(crop >= 0){
+		ofstream fout("crop");
+		m_assert(fout.good());
+		fout << crop * 5;
+		fout.close();
+	}
+
 }
 
 void init_config() {
@@ -494,6 +570,8 @@ void init_config() {
 	CFG(MULTIBAND);
 	CFG(LOADHOMO);
 	CFG(OPENCAM);
+	CFG(FISHEYE);
+	CFG(VIDEO_WRITE);
 #undef CFG
 }
 
@@ -559,6 +637,8 @@ int main(int argc, char* argv[]) {
 		planet(argv[2]);
 	else if (command == "loop")
 		loop(argc, argv);
+	else if (command == "loop_old")
+		loop_old(argc, argv);
 	else if (command == "test")
 		test(argc, argv);
 	else if (command == "parameter")
@@ -566,11 +646,6 @@ int main(int argc, char* argv[]) {
 	else
 		// the real routine
 		work(argc, argv);
-	/*sleep(0.5);
-	cv::Mat image = cv::imread("out.jpg");
-	cv::namedWindow("Test window");
-	cv::imshow("Test window", image);
-	cv::waitKey(0);
-	*/
 	return 0;
 }
+

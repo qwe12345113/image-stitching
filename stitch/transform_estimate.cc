@@ -197,7 +197,7 @@ bool TransformEstimation::fill_inliers_to_matchinfo(
 	if (r2m < INLIER_IN_MATCH_RATIO) return false;
 	float r2p = inliers.size() * 1.0f / get_keypoint_cnt(overlap, false);
 	if (r2p < 0.01 || r2p > 1) return false;
-	print_debug("r1mr1p: %lf,%lf, r2mr2p: %lf,%lf\n", r1m, r1p, r2m, r2p);
+	//print_debug("r1mr1p: %lf,%lf, r2mr2p: %lf,%lf\n", r1m, r1p, r2m, r2p);
 
 	info->confidence = (r1p + r2p) * 0.5;
 	if (info->confidence < INLIER_IN_POINTS_RATIO)
@@ -205,7 +205,7 @@ bool TransformEstimation::fill_inliers_to_matchinfo(
 
   double area = polygon_area(overlap);
   double area1 = shape1.w * shape1.h, area2 = shape2.w * shape2.h;
-  print_debug("OverlapArea=%.0lf, ImageArea=%.0lf\n", area, max(area1, area2));
+  //print_debug("OverlapArea=%.0lf, ImageArea=%.0lf\n", area, max(area1, area2));
   if (area / max(area1, area2) < 0.05)
     return false;
 
