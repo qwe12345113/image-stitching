@@ -98,7 +98,7 @@ Matuc LinearBlender::run_uc() {
     int size = images.size();
     int smoothShift = 6;
     int smoothPixel = pow(2, smoothShift-1);
-    int minYPosition = 0, maxYPosition = 10000;
+    int minYPosition = 0, maxYPosition = MAX_OUTPUT_SIZE;
     for (int z = 0; z < size; z++) {
 	    if (minYPosition < images[z].range.min.y) {
 		    minYPosition = images[z].range.min.y;
